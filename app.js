@@ -6,7 +6,8 @@
 const PALETTE = ['#0F766E','#4F46E5','#B45309','#BE123C','#0369A1','#047857','#7C3AED','#C2410C','#0E7490','#DB2777','#65A30D','#475569'];
 const WD = ['周日','周一','周二','周三','周四','周五','周六'];
 const HOUR_PX = 60;                 // 时间轴每小时像素
-const AXIS_W = 24 * HOUR_PX;        // 1440px = 一天 24 小时
+const DAY_START = 6;                // 时间轴从 6:00 开始（凌晨一般无安排）
+const AXIS_W = 18 * HOUR_PX;        // 1080px = 6:00–24:00 共 18 小时
 
 const IMPORTANCE = {
   normal:   { label: '一般',     color: '#16A34A' },
@@ -31,6 +32,7 @@ let pickedColor = PALETTE[0];
 let chatHistory = [];
 let previewCache = {};              // date -> text
 let backendOk = false;              // 本地服务器（AI）是否可用
+let tokenUsage = { prompt: 0, completion: 0, total: 0 };  // AI token 消耗累计
 
 /* ---------- 日期工具 ---------- */
 function pad(n){ return String(n).padStart(2,'0'); }
@@ -47,9 +49,13 @@ function uid(){ return 'e'+Date.now()+Math.random().toString(36).slice(2,7); }
 function pickColor(){ return PALETTE[Math.floor(Math.random()*PALETTE.length)]; }
 function eventsOn(iso){ return (db.events||[]).filter(e=>e.date===iso).sort((a,b)=>toMin(a.start)-toMin(b.start)); }
 function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function eventEndMin(e){ return toMin(e.start) + (e.duration||0); }
+function nowMin(){ const d=new Date(); return d.getHours()*60+d.getMinutes(); }
 
 /* ---------- 待办 / 目标 工具 ---------- */
 function todayIso(){ return fmt(new Date()); }
+function ddlDate(ddl){ return String(ddl||'').slice(0,10); }
+function ddlTime(ddl){ return String(ddl||'').slice(11,16) || '23:59'; }
 function daysUntil(iso){ return Math.round((parse(iso)-parse(todayIso()))/86400000); }
 function liveTodos(){
   const t = todayIso();
@@ -57,7 +63,7 @@ function liveTodos(){
 }
 function effectiveImportance(t){
   // ddl 当天且重要程度≥重要 → 自动升级为「非常紧急」
-  if (t.status!=='done' && t.ddl===todayIso() && (t.importance==='important'||t.importance==='urgent'||t.importance==='critical')) return 'critical';
+  if (t.status!=='done' && ddlDate(t.ddl)===todayIso() && (t.importance==='important'||t.importance==='urgent'||t.importance==='critical')) return 'critical';
   return t.importance;
 }
 function periodKey(period){
@@ -83,7 +89,7 @@ function periodRange(mode){
 function homeReminders(){
   return liveTodos()
     .filter(t=>t.status!=='done')
-    .filter(t=>t.importance==='critical' || daysUntil(t.ddl)<=3)
+    .filter(t=>t.importance==='critical' || daysUntil(ddlDate(t.ddl))<=3)
     .sort((a,b)=>a.ddl.localeCompare(b.ddl));
 }
 function goalsSorted(){
@@ -150,7 +156,18 @@ async function ai(payload){
   const r = await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   const j = await r.json();
   if (!r.ok) throw new Error(j.error || ('AI 请求失败 ('+r.status+')'));
+  if (j.usage){
+    tokenUsage.prompt += j.usage.prompt_tokens||0;
+    tokenUsage.completion += j.usage.completion_tokens||0;
+    tokenUsage.total += j.usage.total_tokens||0;
+    updateTokenUI();
+  }
   return j;
+}
+
+function updateTokenUI(){
+  const el = document.getElementById('chatFoot');
+  if (el) el.textContent = `Token 消耗：本次会话 ${tokenUsage.total}（输入 ${tokenUsage.prompt} / 输出 ${tokenUsage.completion}）`;
 }
 
 /* ============================================================
@@ -167,10 +184,36 @@ function render(){
 }
 
 /* ---------- 首页 / 日视图 ---------- */
+function eventRowHtml(e, isPast){
+  const end = minToHHMM(eventEndMin(e));
+  let h = `<div class="evt-row${isPast?' past':''}" data-id="${e.id}"><span class="bar" style="background:${e.color}"></span>`;
+  h += `<span class="time tnum">${e.start}–${end}</span>`;
+  h += `<div class="body"><div class="name">${esc(e.name)}</div>`;
+  if (e.description) h += `<div class="desc">${esc(e.description)}</div>`;
+  h += `</div><button class="del" data-del="${e.id}" title="删除">✕</button></div>`;
+  return h;
+}
+
+function nextEventCard(list){
+  const nm = nowMin();
+  const next = list.find(e=>toMin(e.start) > nm);
+  if (!next) return `<div class="next-card"><span class="icon">🎉</span><div class="txt"><div class="lbl">下一项日程</div><div class="val">今天没有更多日程了，好好休息吧～</div></div></div>`;
+  const mins = toMin(next.start) - nm;
+  let when;
+  if (mins < 60) when = `${mins} 分钟`;
+  else { const h=Math.floor(mins/60), m=mins%60; when = m ? `${h} 小时 ${m} 分钟` : `${h} 小时`; }
+  const val = `<b>${when}后</b>，「${esc(next.name)}」将开始`;
+  return `<div class="next-card"><span class="icon">⏳</span><div class="txt"><div class="lbl">下一项日程</div><div class="val">${val}</div></div></div>`;
+}
+
 function renderDay(v, date, showBack){
   const iso = fmt(date);
   const isToday = iso === todayIso();
   const list = eventsOn(iso);
+  const nm = nowMin();
+  const past = isToday ? list.filter(e=>eventEndMin(e)<nm) : [];
+  const upcoming = isToday ? list.filter(e=>eventEndMin(e)>=nm) : list;
+
   let html = '<div class="home">';
   if (showBack) html += `<div class="back-row"><button class="back-btn" id="backBtn">← 返回</button></div>`;
   html += `<div class="home-head"><div>`;
@@ -178,26 +221,32 @@ function renderDay(v, date, showBack){
   html += `<div class="sub">${isToday?'今天':date.getFullYear()+'年'} · ${list.length} 项安排</div>`;
   html += `</div><button class="add-btn" id="addBtn" title="添加日程">＋</button></div>`;
 
-  if (isToday){
-    html += `<div class="ai-card"><div class="ai-head"><span class="t">🐱 今日纪要</span><button class="regen" id="regenBtn">重新生成</button></div>`;
-    html += `<div class="ai-body" id="aiPreviewBody"></div></div>`;
-  }
+  if (isToday) html += `<div class="home-columns">`;
+  html += `<div class="home-main">`;
+
+  // 下一项日程倒计时（原纪要位置）
+  if (isToday) html += nextEventCard(list);
 
   html += `<div class="schedule-title">日程安排</div><div class="schedule-list">`;
-  if (!list.length) html += `<div class="empty"><div class="big">📭</div>这一天还没有安排，点右上角 ＋ 添加，或让 AI 帮你生成。</div>`;
-  list.forEach(e=>{
-    html += `<div class="evt-row" data-id="${e.id}"><span class="bar" style="background:${e.color}"></span>`;
-    html += `<span class="time tnum">${e.start}</span>`;
-    html += `<div class="body"><div class="name">${esc(e.name)}</div><div class="meta">${durLabel(e.duration)}${e.description?' · '+esc(e.description):''}</div></div>`;
-    html += `<button class="del" data-del="${e.id}" title="删除">✕</button></div>`;
-  });
-  html += `</div>`;
+  if (!list.length){
+    html += `<div class="empty"><div class="big">📭</div>这一天还没有安排，点右上角 ＋ 添加，或让 AI 帮你生成。</div>`;
+  } else {
+    upcoming.forEach(e=> html += eventRowHtml(e, false));
+    if (past.length) html += `<div class="past-divider"><span>已结束</span></div>`;
+    past.forEach(e=> html += eventRowHtml(e, true));
+  }
+  html += `</div></div>`; // schedule-list + home-main
 
   if (isToday){
+    html += `<aside class="home-side">`;
+    // 🐱 今日纪要（移到右上）
+    html += `<div class="ai-card"><div class="ai-head"><span class="t">🐱 今日纪要</span><button class="regen" id="regenBtn">重新生成</button></div>`;
+    html += `<div class="ai-body" id="aiPreviewBody"></div></div>`;
     // 待办提醒（ddl 临近 / 非常紧急）
     const rem = homeReminders();
+    html += `<div class="schedule-title">待办提醒</div>`;
     if (rem.length){
-      html += `<div class="schedule-title">待办提醒</div><div class="reminder-list">`;
+      html += `<div class="reminder-list">`;
       rem.forEach(t=>{
         const imp = effectiveImportance(t);
         const c = IMPORTANCE[imp].color;
@@ -206,11 +255,14 @@ function renderDay(v, date, showBack){
         html += `<span class="chev">›</span></div>`;
       });
       html += `</div>`;
+    } else {
+      html += `<div class="empty small"><div class="big">🍃</div>暂无待办提醒</div>`;
     }
-    // 目标（最下方）
+    // 目标
     const goals = goalsSorted();
+    html += `<div class="schedule-title">目标</div>`;
     if (goals.length){
-      html += `<div class="schedule-title">目标</div><div class="goal-list">`;
+      html += `<div class="goal-list">`;
       goals.forEach(g=>{
         const c = goalCount(g), done = c>=g.freq;
         html += `<div class="goal-row" data-goal="${g.id}"><div class="body">`;
@@ -219,9 +271,14 @@ function renderDay(v, date, showBack){
         html += `<span class="goal-status ${done?'done':''}">${goalStatus(g)}</span></div>`;
       });
       html += `</div>`;
+    } else {
+      html += `<div class="empty small"><div class="big">🎯</div>暂无目标</div>`;
     }
+    html += `</aside>`;
+    html += `</div>`; // home-columns
   }
-  html += `</div>`;
+
+  html += `</div>`; // home
   v.innerHTML = html;
 
   if (isToday) renderPreview(iso);
@@ -275,7 +332,7 @@ function renderCalendar(v){
     const out = d.getMonth()!==m;
     const isToday = iso===tIso;
     const list = eventsOn(iso);
-    const tds = liveTodos().filter(t=>t.ddl===iso && t.status!=='done');
+    const tds = liveTodos().filter(t=>ddlDate(t.ddl)===iso && t.status!=='done');
     const cls=['cal-cell',out?'out':'',(d.getDay()===0||d.getDay()===6)?'wk':'',isToday?'today':''].filter(Boolean).join(' ');
     const dots = list.slice(0,5).map(e=>`<span class="dot" style="background:${e.color}"></span>`).join('')
       + tds.slice(0,3).map(t=>`<span class="dot tdot" style="background:${IMPORTANCE[effectiveImportance(t)].color}"></span>`).join('');
@@ -293,7 +350,7 @@ function renderTimeline(v){
   const tIso = todayIso();
   const days=[]; for(let i=0;i<7;i++) days.push(addDays(weekCursor,i));
   const weekIsos = days.map(d=>fmt(d));
-  const weekTodos = liveTodos().filter(t=>t.status!=='done' && weekIsos.includes(t.ddl));
+  const weekTodos = liveTodos().filter(t=>t.status!=='done' && weekIsos.includes(ddlDate(t.ddl)));
   let html = '<div class="timeline">';
   html += `<div class="tl-head"><span class="ttl">本周</span>`;
   html += `<div class="nav"><button class="navbtn" id="wkPrev">‹</button><button class="today-btn" id="wkToday">回到本周</button><button class="navbtn" id="wkNext">›</button></div></div>`;
@@ -301,7 +358,7 @@ function renderTimeline(v){
     html += `<div class="tl-todos"><span class="tl-todos-title">待办（点击名称查看详情）</span><div class="tl-todo-chips">`;
     weekTodos.forEach(t=>{
       const c = IMPORTANCE[effectiveImportance(t)].color;
-      html += `<button class="todo-chip" data-todo="${t.id}" style="--c:${c}">${esc(t.name)}<span class="c-ddl tnum">${t.ddl.slice(5)}</span></button>`;
+      html += `<button class="todo-chip" data-todo="${t.id}" style="--c:${c}">${esc(t.name)}<span class="c-ddl tnum">${ddlDate(t.ddl).slice(5)} ${ddlTime(t.ddl)}</span></button>`;
     });
     html += `</div></div>`;
   }
@@ -311,19 +368,20 @@ function renderTimeline(v){
     const iso=fmt(d), isToday=iso===tIso;
     html += `<div class="tl-row"><div class="tl-day ${isToday?'today':''}"><span class="wd">${WD[d.getDay()]}</span><span class="dt tnum">${d.getMonth()+1}/${d.getDate()}</span></div>`;
     html += `<div class="tl-axis" data-date="${iso}">`;
-    for(let h=0;h<=24;h++){
+    for(let h=DAY_START;h<=24;h++){
       const major = h%3===0;
-      html += `<div class="gridline ${major?'major':''}" style="left:${h*HOUR_PX}px"></div>`;
-      if (major && h<24) html += `<div class="glabel tnum" style="left:${h*HOUR_PX}px">${pad(h)}:00</div>`;
+      html += `<div class="gridline ${major?'major':''}" style="left:${(h-DAY_START)*HOUR_PX}px"></div>`;
+      if (major && h<24) html += `<div class="glabel tnum" style="left:${(h-DAY_START)*HOUR_PX}px">${pad(h)}:00</div>`;
     }
     eventsOn(iso).forEach(e=>{
-      const left = toMin(e.start)/60*HOUR_PX;
+      const left = Math.max(0, (toMin(e.start)/60 - DAY_START)*HOUR_PX);
       const width = Math.max(e.duration/60*HOUR_PX, 6);
       html += `<div class="tl-event" data-date="${iso}" style="left:${left}px;width:${width}px;background:${e.color}" title="${esc(e.name)} ${e.start}（${durLabel(e.duration)}）"><span class="nm">${esc(e.name)}</span></div>`;
     });
-    weekTodos.filter(t=>t.ddl===iso).forEach(t=>{
+    weekTodos.filter(t=>ddlDate(t.ddl)===iso).forEach(t=>{
       const c = IMPORTANCE[effectiveImportance(t)].color;
-      html += `<div class="tl-todo-line" data-todo="${t.id}" style="background:${c}" title="${esc(t.name)} · ddl"></div>`;
+      const left = Math.max(0, (toMin(ddlTime(t.ddl))/60 - DAY_START)*HOUR_PX);
+      html += `<div class="tl-todo-line" data-todo="${t.id}" style="left:${left}px;background:${c}" title="${esc(t.name)} · ddl ${ddlTime(t.ddl)}"></div>`;
     });
     html += `</div></div>`;
   });
@@ -336,7 +394,7 @@ function renderGoals(v){
   const range = periodRange(taskMode);
   const today = todayIso();
   const all = liveTodos();
-  const pending = all.filter(t=>t.status!=='done' && t.ddl<=range.end).sort((a,b)=>a.ddl.localeCompare(b.ddl));
+  const pending = all.filter(t=>t.status!=='done' && ddlDate(t.ddl)<=range.end).sort((a,b)=>a.ddl.localeCompare(b.ddl));
   const doneToday = all.filter(t=>t.status==='done' && t.doneAt===today).sort((a,b)=>a.ddl.localeCompare(b.ddl));
   const goals = (db.goals||[]).filter(g=>g.period===taskMode);
 
@@ -425,13 +483,15 @@ function openTaskAdd(id, type){
     } else {
       const t = db.todos.find(x=>x.id===id);
       document.getElementById('tName').value = t.name;
-      document.getElementById('tDdl').value = t.ddl;
+      document.getElementById('tDdl').value = ddlDate(t.ddl);
+      document.getElementById('tDdlTime').value = ddlTime(t.ddl);
       document.getElementById('tImportance').value = t.importance;
       document.getElementById('tDesc').value = t.description||'';
     }
   } else {
     document.getElementById('tName').value = '';
     document.getElementById('tDdl').value = today;
+    document.getElementById('tDdlTime').value = '18:00';
     document.getElementById('tImportance').value = 'important';
     document.getElementById('tDesc').value = '';
     document.getElementById('gPeriod').value = 'week';
@@ -523,7 +583,7 @@ const CHAT_TOOLS = [
   { type:'function', function:{ name:'list_events', description:'查看某天的日程', parameters:{ type:'object', properties:{ date:{type:'string',description:'日期 YYYY-MM-DD，可选，默认今天'} } } } },
   { type:'function', function:{ name:'add_event', description:'添加一条日程', parameters:{ type:'object', properties:{ name:{type:'string',description:'事件名称'}, date:{type:'string',description:'YYYY-MM-DD'}, start:{type:'string',description:'HH:MM'}, duration:{type:'integer',description:'分钟'}, description:{type:'string'} }, required:['name','date','start'] } } },
   { type:'function', function:{ name:'remove_event', description:'删除日程（按日期+名称匹配）', parameters:{ type:'object', properties:{ date:{type:'string',description:'YYYY-MM-DD'}, name:{type:'string',description:'要删除的事件名称（支持部分匹配）'} }, required:['date','name'] } } },
-  { type:'function', function:{ name:'add_todo', description:'添加一条待办（有截止日期）', parameters:{ type:'object', properties:{ name:{type:'string',description:'待办名称'}, ddl:{type:'string',description:'截止日期 YYYY-MM-DD'}, importance:{type:'string',description:'重要程度，可选值：normal/important/urgent/critical，默认 important',enum:['normal','important','urgent','critical']}, description:{type:'string'} }, required:['name','ddl'] } } },
+  { type:'function', function:{ name:'add_todo', description:'添加一条待办（有截止日期）', parameters:{ type:'object', properties:{ name:{type:'string',description:'待办名称'}, ddl:{type:'string',description:'截止日期 YYYY-MM-DD，可带时间 HH:MM（如 2026-10-15 18:00）'}, importance:{type:'string',description:'重要程度，可选值：normal/important/urgent/critical，默认 important',enum:['normal','important','urgent','critical']}, description:{type:'string'} }, required:['name','ddl'] } } },
   { type:'function', function:{ name:'add_goal', description:'添加一个目标（每周/每月 N 次）', parameters:{ type:'object', properties:{ name:{type:'string',description:'目标名称'}, period:{type:'string',description:'周期 week(每周) 或 month(每月)',enum:['week','month']}, freq:{type:'integer',description:'每周/每月几次'}, description:{type:'string'} }, required:['name','period','freq'] } } },
   { type:'function', function:{ name:'remove_todo', description:'删除待办（按名称匹配）', parameters:{ type:'object', properties:{ name:{type:'string',description:'要删除的待办名称（支持部分匹配）'} }, required:['name'] } } },
   { type:'function', function:{ name:'remove_goal', description:'删除目标（按名称匹配）', parameters:{ type:'object', properties:{ name:{type:'string',description:'要删除的目标名称（支持部分匹配）'} }, required:['name'] } } },
@@ -536,7 +596,7 @@ async function runTool(name, args){
   if (name==='list_events'){
     const d = args.date || today;
     const list = eventsOn(d);
-    const tds = liveTodos().filter(t=>t.ddl===d && t.status!=='done');
+    const tds = liveTodos().filter(t=>ddlDate(t.ddl)===d && t.status!=='done');
     let out = [];
     if (!list.length && !tds.length) return { result:`${d} 没有日程或待办` };
     if (list.length) out.push('日程：'+list.map(e=>`${e.start} ${e.name}（${durLabel(e.duration)}）`).join('；'));
@@ -554,7 +614,8 @@ async function runTool(name, args){
     return { ok:true, removed: before - db.events.length };
   }
   if (name==='add_todo'){
-    const t = { id:uid(), name:args.name, ddl:args.ddl||today, description:args.description||'', importance:['normal','important','urgent','critical'].includes(args.importance)?args.importance:'important', status:'todo', doneAt:null, createdAt:Date.now() };
+    let ddl = args.ddl||today; if (!ddl.includes(' ')) ddl += ' 23:59';
+    const t = { id:uid(), name:args.name, ddl, description:args.description||'', importance:['normal','important','urgent','critical'].includes(args.importance)?args.importance:'important', status:'todo', doneAt:null, createdAt:Date.now() };
     db.todos.push(t);
     return { ok:true, added:`待办 ${t.name}（ddl ${t.ddl}）` };
   }
@@ -701,7 +762,7 @@ document.getElementById('view').addEventListener('click', async e=>{
   if (axis && !bar){
     const rect=axis.getBoundingClientRect();
     const x=e.clientX-rect.left;
-    const minutes=Math.floor(x/HOUR_PX*60/30)*30;
+    const minutes=DAY_START*60 + Math.floor(x/HOUR_PX*60/30)*30;
     openAdd(null, axis.dataset.date, minToHHMM(minutes));
     return;
   }
@@ -770,8 +831,8 @@ document.getElementById('taskSave').onclick=async ()=>{
   const name=document.getElementById('tName').value.trim();
   if(!name){ toast('请填写名称'); return; }
   if (taskType==='todo'){
-    const ddl = document.getElementById('tDdl').value;
-    if(!ddl){ toast('请填写截止日期 DDL'); return; }
+    const ddl = document.getElementById('tDdl').value + ' ' + (document.getElementById('tDdlTime').value || '23:59');
+    if(!document.getElementById('tDdl').value){ toast('请填写截止日期 DDL'); return; }
     const data = {
       name,
       ddl,
