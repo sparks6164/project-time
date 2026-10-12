@@ -323,13 +323,17 @@ async function renderPreview(iso){
   }
   el.className = 'ai-body loading'; el.textContent = '小猫正在给主人写纪要…';
   const tg = timeGreeting();
+  const isToday = iso === todayIso();
+  const greeting = isToday
+    ? `现在是「${tg.greet}」的时段。${tg.vibe}。开头用贴合当前时段的问候打招呼（说「${tg.greet}」就好，不要总是说早安），并自然地带上贴合时段的人性化小提醒。`
+    : `这是一份「这一天的预告」，不要用「早安/晚安」这类时间问候（会显得奇怪），开头改用俏皮可爱的招呼（比如「喵～主人」），轻松活泼地带主人看看这一天的安排。`;
   try {
     const parts = [];
     if (list.length) parts.push('【日程】\n'+list.map(e=>`${e.start} ${e.name}（${durLabel(e.duration)}${e.description?('，'+e.description):''}）`).join('\n'));
     if (rem.length) parts.push('【待办提醒】\n'+rem.map(t=>`${t.name}（ddl ${t.ddl}，${IMPORTANCE[effectiveImportance(t)].label}）`).join('\n'));
     if (goals.length) parts.push('【目标】\n'+goals.map(g=>`${g.name}（${g.period==='week'?'每周':'每月'} ${g.freq} 次，已完成 ${Math.min(goalCount(g),g.freq)}/${g.freq}）`).join('\n'));
     const j = await ai({messages:[
-      {role:'system',content:`你是主人的猫娘日程助手「小喵」。现在是「${tg.greet}」的时段。${tg.vibe}。请用可爱的猫娘语气（适当用「喵」「主人」等口癖，但不要过度堆砌）为主人写一段当日纪要：开头要用贴合当前时段的问候打招呼（说「${tg.greet}」就好，不要总是说早安），语气温暖、给足情绪价值（关心、鼓励、卖萌），并自然地带上贴合时段的人性化小提醒。把重要内容（具体时间、事件名称、截止日期、紧急事项、目标进度）用 **双星号** 包起来加粗。用中文，160字以内，可以分1-2小段，只输出纪要正文，不要标题或序号。`},
+      {role:'system',content:`你是主人的猫娘日程助手「小喵」。${greeting} 请用可爱的猫娘语气（适当用「喵」「主人」等口癖，但不要过度堆砌）为主人写一段当日纪要，语气温暖、给足情绪价值（关心、鼓励、卖萌）。把重要内容（具体时间、事件名称、截止日期、紧急事项、目标进度）用 **双星号** 包起来加粗。用中文，160字以内，可以分1-2小段，只输出纪要正文，不要标题或序号。`},
       {role:'user',content:`日期是 ${iso}（${WD[parse(iso).getDay()]}）。我这一天的信息：\n${parts.join('\n\n')}`}
     ],temperature:0.8});
     const text = (j.choices[0].message.content||'').trim();
