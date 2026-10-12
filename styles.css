@@ -56,7 +56,20 @@ main { flex: 1; overflow-y: auto; overflow-x: hidden; position: relative; }
 .view { height: 100%; overflow-y: auto; }
 
 /* ============ 首页 / 日视图 ============ */
-.home { max-width: 720px; margin: 0 auto; padding: 28px 22px 60px; }
+.home { max-width: 1080px; margin: 0 auto; padding: 28px 22px 60px; }
+.home-columns { display: grid; grid-template-columns: 1fr 320px; gap: 28px; align-items: start; }
+.home-main { min-width: 0; }
+.home-side { position: sticky; top: 16px; display: flex; flex-direction: column; }
+.home-side .ai-card { margin-bottom: 16px; }
+.next-card { display: flex; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 16px 18px; margin-bottom: 22px; }
+.next-card .icon { font-size: 26px; line-height: 1; }
+.next-card .txt { flex: 1; min-width: 0; }
+.next-card .lbl { font-size: 12px; color: var(--text-3); letter-spacing: .04em; margin-bottom: 4px; }
+.next-card .val { font-size: 15px; color: var(--text-2); line-height: 1.5; }
+.next-card .val b { color: var(--brand); font-weight: 700; }
+.past-divider { display: flex; align-items: center; gap: 10px; margin: 14px 0 8px; color: var(--text-3); font-size: 11px; font-weight: 600; letter-spacing: .05em; }
+.past-divider::before, .past-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.past-divider span { padding: 2px 10px; border-radius: var(--radius-full); background: var(--surface-2); color: var(--text-3); }
 .home-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
 .home-head .date { font-family: var(--font-display); font-weight: 600; font-size: 28px; line-height: 1.2; }
 .home-head .sub { color: var(--text-2); font-size: 14px; margin-top: 4px; }
@@ -82,10 +95,12 @@ main { flex: 1; overflow-y: auto; overflow-x: hidden; position: relative; }
 .evt-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); cursor: pointer; transition: border-color var(--ease-out) 120ms; }
 .evt-row:hover { border-color: var(--line-strong); }
 .evt-row .bar { width: 4px; align-self: stretch; border-radius: 2px; flex-shrink: 0; }
-.evt-row .time { font-family: var(--font-mono); font-size: 13px; color: var(--text-2); min-width: 84px; }
+.evt-row .time { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--text-2); min-width: 108px; }
 .evt-row .body { flex: 1; min-width: 0; }
-.evt-row .name { font-weight: 500; }
-.evt-row .meta { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.evt-row .name { font-weight: 600; }
+.evt-row .desc { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.evt-row.past { opacity: .5; }
+.evt-row.past .name, .evt-row.past .time, .evt-row.past .desc { color: var(--text-3); }
 .evt-row .del { opacity: 0; font-size: 14px; color: var(--text-3); padding: 4px; border-radius: var(--radius-sm); transition: opacity var(--ease-out) 120ms; }
 .evt-row:hover .del { opacity: 1; }
 .evt-row .del:hover { color: var(--danger); background: var(--surface-2); }
@@ -126,7 +141,7 @@ main { flex: 1; overflow-y: auto; overflow-x: hidden; position: relative; }
 .tl-day .wd { font-size: 13px; font-weight: 600; }
 .tl-day .dt { font-size: 11px; color: var(--text-3); }
 .tl-day.today .wd { color: var(--brand); }
-.tl-axis { position: relative; flex: 1; width: 1440px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; }
+.tl-axis { position: relative; flex: 1; width: 1080px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; }
 .tl-axis .gridline { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px solid var(--surface-2); }
 .tl-axis .gridline.major { border-left-color: var(--line); }
 .tl-axis .glabel { position: absolute; top: 2px; font-family: var(--font-mono); font-size: 10px; color: var(--text-3); transform: translateX(-50%); }
@@ -171,6 +186,7 @@ main { flex: 1; overflow-y: auto; overflow-x: hidden; position: relative; }
 .chat-input textarea { flex: 1; resize: none; border: 1px solid var(--line-strong); border-radius: var(--radius-md); padding: 9px 11px; background: var(--surface); outline: none; height: 42px; }
 .chat-input textarea:focus { border-color: var(--focus-ring); box-shadow: 0 0 0 3px var(--brand-soft); }
 .chat-input button { padding: 0 16px; border-radius: var(--radius-md); background: var(--brand); color: #fff; font-weight: 600; }
+.chat-foot { padding: 8px 14px; border-top: 1px solid var(--line); font-size: 11px; color: var(--text-3); font-family: var(--font-mono); text-align: right; }
 
 /* ============ Toast ============ */
 #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: var(--radius-md); font-size: 13px; font-weight: 500; opacity: 0; transition: all var(--ease-out) 200ms; z-index: 99; box-shadow: var(--shadow-lg); }
@@ -180,6 +196,11 @@ main { flex: 1; overflow-y: auto; overflow-x: hidden; position: relative; }
   .brand span.name { display: none; }
   .tabs button { padding: 6px 10px; }
   .chat-panel { width: 100vw; max-width: 100vw; }
+}
+
+@media (max-width: 900px) {
+  .home-columns { grid-template-columns: 1fr; }
+  .home-side { position: static; }
 }
 
 /* ============ 分段选择器（类型 / 周月切换） ============ */
@@ -243,7 +264,7 @@ main { flex: 1; overflow-y: auto; overflow-x: hidden; position: relative; }
 .todo-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: var(--radius-full); border: 1.5px solid var(--c); color: var(--c); font-size: 13px; font-weight: 500; background: var(--surface); }
 .todo-chip:hover { background: var(--surface-2); }
 .todo-chip .c-ddl { font-size: 11px; opacity: .72; }
-.tl-todo-line { position: absolute; top: 0; bottom: 0; left: 3px; width: 3px; border-radius: 2px; cursor: pointer; z-index: 2; }
+.tl-todo-line { position: absolute; top: 0; bottom: 0; width: 2px; border-radius: 2px; cursor: pointer; z-index: 2; }
 
 /* 日历里的待办小标记（方形区分日程圆点） */
 .cal-cell .dot.tdot { border-radius: 2px; }
