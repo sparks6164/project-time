@@ -54,6 +54,17 @@ function eventsOn(iso){ return (db.events||[]).filter(e=>e.date===iso).sort((a,b
 function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function eventEndMin(e){ return toMin(e.start) + (e.duration||0); }
 function nowMin(){ const d=new Date(); return d.getHours()*60+d.getMinutes(); }
+function timeBucket(){ const h=new Date().getHours(); if(h<6)return 'dawn'; if(h<11)return 'morning'; if(h<14)return 'noon'; if(h<18)return 'afternoon'; if(h<22)return 'evening'; return 'night'; }
+function timeGreeting(){
+  const h = new Date().getHours();
+  if (h<6)  return { greet:'夜深了', vibe:'现在已是深夜，温柔地提醒主人别熬夜、早点休息' };
+  if (h<11) return { greet:'早安',   vibe:'现在是早晨，给主人元气满满的鼓励，提醒吃早餐、开启美好的一天' };
+  if (h<14) return { greet:'中午好', vibe:'临近中午，关心主人有没有好好吃午饭、适当午休' };
+  if (h<18) return { greet:'下午好', vibe:'现在是下午，为主人加油打气，提醒劳逸结合、喝口水活动一下' };
+  if (h<22) return { greet:'晚上好', vibe:'现在是晚上，帮主人回顾一天、安排晚间，语气放松温暖' };
+  return { greet:'夜深了', vibe:'夜已深，温柔提醒主人早点休息，别熬太晚' };
+}
+function previewKey(iso){ return iso + '|' + timeBucket(); }
 
 /* ---------- 待办 / 目标 工具 ---------- */
 function todayIso(){ return fmt(new Date()); }
@@ -302,25 +313,27 @@ function renderDay(v, date, showBack){
 async function renderPreview(iso){
   const el = document.getElementById('aiPreviewBody'); if(!el) return;
   if (!backendOk){ el.className='ai-body'; el.textContent='（静态版）AI 今日纪要需本地运行 node server.js'; return; }
-  if (previewCache[iso]){ el.className='ai-body'; el.innerHTML = mdBold(previewCache[iso]); return; }
+  const key = previewKey(iso);
+  if (previewCache[key]){ el.className='ai-body'; el.innerHTML = mdBold(previewCache[key]); return; }
   const list = eventsOn(iso);
   const rem = homeReminders();
   const goals = (db.goals||[]);
   if (!list.length && !rem.length && !goals.length){
-    const t='喵～主人今天还没有安排和待办呢，先点右上角「＋」添加，或让小猫帮你 AI 导入吧～'; previewCache[iso]=t; el.innerHTML = mdBold(t); return;
+    const t='喵～主人这一天还没有安排和待办呢，先点右上角「＋」添加，或让小猫帮你 AI 导入吧～'; previewCache[key]=t; el.innerHTML = mdBold(t); return;
   }
   el.className = 'ai-body loading'; el.textContent = '小猫正在给主人写纪要…';
+  const tg = timeGreeting();
   try {
     const parts = [];
     if (list.length) parts.push('【日程】\n'+list.map(e=>`${e.start} ${e.name}（${durLabel(e.duration)}${e.description?('，'+e.description):''}）`).join('\n'));
     if (rem.length) parts.push('【待办提醒】\n'+rem.map(t=>`${t.name}（ddl ${t.ddl}，${IMPORTANCE[effectiveImportance(t)].label}）`).join('\n'));
     if (goals.length) parts.push('【目标】\n'+goals.map(g=>`${g.name}（${g.period==='week'?'每周':'每月'} ${g.freq} 次，已完成 ${Math.min(goalCount(g),g.freq)}/${g.freq}）`).join('\n'));
     const j = await ai({messages:[
-      {role:'system',content:'你是主人的猫娘日程助手「小喵」。请用可爱的猫娘语气（适当用「喵」「主人」等口癖，但不要过度堆砌）为主人写一段当日纪要，语气温暖、给足情绪价值（关心、鼓励、卖萌）。把重要内容（具体时间、事件名称、截止日期、紧急事项、目标进度）用 **双星号** 包起来加粗。用中文，160字以内，可以分1-2小段，只输出纪要正文，不要标题或序号。'},
+      {role:'system',content:`你是主人的猫娘日程助手「小喵」。现在是「${tg.greet}」的时段。${tg.vibe}。请用可爱的猫娘语气（适当用「喵」「主人」等口癖，但不要过度堆砌）为主人写一段当日纪要：开头要用贴合当前时段的问候打招呼（说「${tg.greet}」就好，不要总是说早安），语气温暖、给足情绪价值（关心、鼓励、卖萌），并自然地带上贴合时段的人性化小提醒。把重要内容（具体时间、事件名称、截止日期、紧急事项、目标进度）用 **双星号** 包起来加粗。用中文，160字以内，可以分1-2小段，只输出纪要正文，不要标题或序号。`},
       {role:'user',content:`日期是 ${iso}（${WD[parse(iso).getDay()]}）。我这一天的信息：\n${parts.join('\n\n')}`}
     ],temperature:0.8});
     const text = (j.choices[0].message.content||'').trim();
-    previewCache[iso] = text;
+    previewCache[key] = text;
     if (document.getElementById('aiPreviewBody')===el){ el.className='ai-body'; el.innerHTML = mdBold(text); }
   } catch(e){
     el.className = 'ai-body err'; el.textContent = '纪要生成失败：'+e.message;
@@ -779,7 +792,7 @@ document.getElementById('view').addEventListener('click', async e=>{
   // 添加日程
   if (e.target.closest('#addBtn')){ openAdd(null, dayDate || homeDate || undefined, undefined); return; }
   // 重新生成纪要
-  if (e.target.closest('#regenBtn')){ delete previewCache[currentDayIso || todayIso()]; render(); return; }
+  if (e.target.closest('#regenBtn')){ delete previewCache[previewKey(currentDayIso || todayIso())]; render(); return; }
   // 目标/待办：添加按钮
   if (e.target.closest('#taskAddBtn')){ openTaskAdd(null, 'todo'); return; }
   // 目标/待办：周/月切换
