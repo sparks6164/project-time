@@ -1,0 +1,11 @@
+# 密钥：绝不能提交到 git / 上传 GitHub
+.env
+.env.local
+
+# 依赖与系统文件
+node_modules/
+.DS_Store
+Thumbs.db
+
+# 本地数据库默认不提交（如需上传，手动把 data.json 加回）
+data.json
