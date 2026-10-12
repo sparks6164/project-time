@@ -264,7 +264,7 @@ function renderCalendar(v){
   const y=monthCursor.getFullYear(), m=monthCursor.getMonth();
   const first = new Date(y,m,1);
   const gridStart = startOfWeek(first);
-  const todayIso = todayIso();
+  const tIso = todayIso();
   let html = '<div class="calendar">';
   html += `<div class="cal-head"><span class="ttl">${y}年${m+1}月</span><div class="nav">`;
   html += `<button class="navbtn" id="calPrev">‹</button><button class="today-btn" id="calToday">今天</button><button class="navbtn" id="calNext">›</button></div></div>`;
@@ -273,7 +273,7 @@ function renderCalendar(v){
   for(let i=0;i<42;i++){
     const d=addDays(gridStart,i), iso=fmt(d);
     const out = d.getMonth()!==m;
-    const isToday = iso===todayIso;
+    const isToday = iso===tIso;
     const list = eventsOn(iso);
     const tds = liveTodos().filter(t=>t.ddl===iso && t.status!=='done');
     const cls=['cal-cell',out?'out':'',(d.getDay()===0||d.getDay()===6)?'wk':'',isToday?'today':''].filter(Boolean).join(' ');
@@ -290,7 +290,7 @@ function renderCalendar(v){
 
 /* ---------- 时间轴 ---------- */
 function renderTimeline(v){
-  const todayIso = todayIso();
+  const tIso = todayIso();
   const days=[]; for(let i=0;i<7;i++) days.push(addDays(weekCursor,i));
   const weekIsos = days.map(d=>fmt(d));
   const weekTodos = liveTodos().filter(t=>t.status!=='done' && weekIsos.includes(t.ddl));
@@ -308,7 +308,7 @@ function renderTimeline(v){
   html += `<div class="tl-hint">点击时间条进入当天视图 · 点击空白处按该时间新建 · 竖线为待办 DDL</div>`;
   html += `<div class="tl-scroll" id="tlScroll">`;
   days.forEach(d=>{
-    const iso=fmt(d), isToday=iso===todayIso;
+    const iso=fmt(d), isToday=iso===tIso;
     html += `<div class="tl-row"><div class="tl-day ${isToday?'today':''}"><span class="wd">${WD[d.getDay()]}</span><span class="dt tnum">${d.getMonth()+1}/${d.getDate()}</span></div>`;
     html += `<div class="tl-axis" data-date="${iso}">`;
     for(let h=0;h<=24;h++){
