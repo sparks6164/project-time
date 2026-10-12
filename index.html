@@ -107,8 +107,11 @@
     </div>
     <div id="todoFields">
       <div class="row">
-        <label for="tDdl">截止日期 DDL <span style="font-weight:400;color:var(--text-3)">（必填）</span></label>
-        <input id="tDdl" type="date">
+        <label for="tDdl">截止日期 DDL <span style="font-weight:400;color:var(--text-3)">（必填，含具体时间）</span></label>
+        <div class="row2">
+          <div><input id="tDdl" type="date" aria-label="截止日期"></div>
+          <div><input id="tDdlTime" type="time" value="18:00" aria-label="截止时间"></div>
+        </div>
       </div>
       <div class="row">
         <label for="tImportance">重要程度</label>
@@ -156,7 +159,7 @@
     <h2>待办详情</h2>
     <div class="detail-list">
       <div class="detail-item"><span class="k">事件名称</span><span class="v" id="tdName"></span></div>
-      <div class="detail-item"><span class="k">截止日期</span><span class="v tnum" id="tdDdl"></span></div>
+      <div class="detail-item"><span class="k">截止时间</span><span class="v tnum" id="tdDdl"></span></div>
       <div class="detail-item"><span class="k">重要程度</span><span class="v"><span class="imp-tag" id="tdImportance"></span></span></div>
       <div class="detail-item"><span class="k">事件描述</span><span class="v" id="tdDesc"></span></div>
       <div class="detail-item"><span class="k">完成状态</span><span class="v"><span id="tdStatus"></span></span></div>
@@ -182,6 +185,7 @@
     <textarea id="chatText" rows="1" placeholder="说说你想怎么调整日程…"></textarea>
     <button id="chatSend">发送</button>
   </div>
+  <div class="chat-foot" id="chatFoot">Token 消耗：本次会话 0（输入 0 / 输出 0）</div>
 </aside>
 
 <div id="toast"></div>
