@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project Time · 项目时间</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="dot"></span><span class="name">Project Time</span></div>
+  <nav class="tabs" id="tabs">
+    <button data-view="home" class="on">首页</button>
+    <button data-view="calendar">日历</button>
+    <button data-view="timeline">时间轴</button>
+  </nav>
+  <div class="spacer"></div>
+  <button class="iconbtn" id="importBtn" title="AI 导入日程">✚</button>
+  <button class="iconbtn" id="themeBtn" title="切换主题">◐</button>
+  <button class="iconbtn" id="chatBtn" title="AI 对话">💬<span class="bubble" id="chatBubble"></span></button>
+</header>
+
+<main id="view"></main>
+
+<!-- 添加/编辑日程 -->
+<div class="overlay" id="addOverlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="编辑日程">
+    <h2 id="addTitle">添加日程</h2>
+    <div class="row">
+      <label for="fName">事件名称</label>
+      <input id="fName" placeholder="例如：产品周会 / 写周报">
+    </div>
+    <div class="row2">
+      <div>
+        <label for="fDate">日期</label>
+        <input id="fDate" type="date">
+      </div>
+      <div>
+        <label for="fStart">开始时间</label>
+        <input id="fStart" type="time">
+      </div>
+    </div>
+    <div class="row">
+      <label for="fDuration">事件时长</label>
+      <select id="fDuration">
+        <option value="30">30 分钟</option>
+        <option value="60" selected>1 小时</option>
+        <option value="90">1.5 小时</option>
+        <option value="120">2 小时</option>
+        <option value="180">3 小时</option>
+        <option value="240">4 小时</option>
+        <option value="480">全天（8 小时）</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>事件颜色 <span id="colorHint" style="font-weight:400;color:var(--text-3)">（已自动生成，可点选更换）</span></label>
+      <div class="color-row" id="colorRow"></div>
+    </div>
+    <div class="row">
+      <label for="fDesc">事件描述 <span style="font-weight:400;color:var(--text-3)">（可选，可跳过）</span></label>
+      <textarea id="fDesc" rows="2" placeholder="补充说明…"></textarea>
+    </div>
+    <div class="actions">
+      <button class="ghost-btn danger" id="delBtn" style="display:none">删除</button>
+      <button class="ghost-btn" id="cancelBtn">取消</button>
+      <button class="primary-btn" id="saveBtn">添加</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI 导入日程 -->
+<div class="overlay" id="importOverlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="AI 导入日程">
+    <h2>AI 自动导入日程</h2>
+    <div class="row">
+      <label for="fImportText">输入一段文字，AI 会自动识别日程并添加到时间轴</label>
+      <textarea id="fImportText" rows="5" placeholder="例如：明天下午3点开产品会，约2小时；周五早上写周报半小时"></textarea>
+    </div>
+    <div class="row">
+      <label>上传图片识别</label>
+      <input type="file" id="fImportImg" accept="image/*" disabled>
+      <span style="font-size:12px;color:var(--text-3)">DeepSeek 目前仅支持文字，暂不支持图片识别（占位）</span>
+    </div>
+    <div class="actions">
+      <button class="ghost-btn" id="importCancel">取消</button>
+      <button class="primary-btn" id="importGo">导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI 对话面板 -->
+<aside class="chat-panel" id="chatPanel" aria-label="AI 对话">
+  <div class="chat-head">
+    <span class="t">AI 日程助手</span>
+    <button class="x" id="chatClose">✕</button>
+  </div>
+  <div class="chat-body" id="chatBody">
+    <div class="msg ai">你好，我是你的日程助手。可以让我帮你添加、删除或查看日程，例如：<br>· 「明天下午3点加一个1小时的健身」<br>· 「把周五的会议删掉」<br>· 「这周有什么安排？」</div>
+  </div>
+  <div class="chat-input">
+    <textarea id="chatText" rows="1" placeholder="说说你想怎么调整日程…"></textarea>
+    <button id="chatSend">发送</button>
+  </div>
+</aside>
+
+<div id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
