@@ -172,6 +172,22 @@
   </div>
 </div>
 
+<!-- 随心日志 弹窗 -->
+<div class="overlay" id="journalOverlay">
+  <div class="modal journal-modal" role="dialog" aria-modal="true" aria-label="随心日志">
+    <h2 id="journalTitle">随心日志</h2>
+    <div class="row">
+      <label id="journalHint" style="font-weight:400;color:var(--text-3)">记录今天的心情</label>
+      <textarea id="journalText" rows="11" placeholder="写下今天的心情、随想…"></textarea>
+    </div>
+    <div class="actions">
+      <button class="ghost-btn" id="journalClose">关闭</button>
+      <button class="ghost-btn" id="journalPolish" style="display:none">✨ AI 润色</button>
+      <button class="primary-btn" id="journalSave" style="display:none">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- AI 对话面板 -->
 <aside class="chat-panel" id="chatPanel" aria-label="AI 对话">
   <div class="chat-head">
