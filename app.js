@@ -55,15 +55,6 @@ function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 function eventEndMin(e){ return toMin(e.start) + (e.duration||0); }
 function nowMin(){ const d=new Date(); return d.getHours()*60+d.getMinutes(); }
 function timeBucket(){ const h=new Date().getHours(); if(h<6)return 'dawn'; if(h<11)return 'morning'; if(h<14)return 'noon'; if(h<18)return 'afternoon'; if(h<22)return 'evening'; return 'night'; }
-function timeGreeting(){
-  const h = new Date().getHours();
-  if (h<6)  return { greet:'夜深了', vibe:'现在已是深夜，温柔地提醒主人别熬夜、早点休息' };
-  if (h<11) return { greet:'早安',   vibe:'现在是早晨，给主人元气满满的鼓励，提醒吃早餐、开启美好的一天' };
-  if (h<14) return { greet:'中午好', vibe:'临近中午，关心主人有没有好好吃午饭、适当午休' };
-  if (h<18) return { greet:'下午好', vibe:'现在是下午，为主人加油打气，提醒劳逸结合、喝口水活动一下' };
-  if (h<22) return { greet:'晚上好', vibe:'现在是晚上，帮主人回顾一天、安排晚间，语气放松温暖' };
-  return { greet:'夜深了', vibe:'夜已深，温柔提醒主人早点休息，别熬太晚' };
-}
 function previewKey(iso){ return iso + '|' + timeBucket(); }
 
 /* ---------- 待办 / 目标 工具 ---------- */
@@ -322,10 +313,11 @@ async function renderPreview(iso){
     const t='喵～主人这一天还没有安排和待办呢，先点右上角「＋」添加，或让小猫帮你 AI 导入吧～'; previewCache[key]=t; el.innerHTML = mdBold(t); return;
   }
   el.className = 'ai-body loading'; el.textContent = '小猫正在给主人写纪要…';
-  const tg = timeGreeting();
+  const now = new Date();
+  const nowLabel = `${now.getMonth()+1}月${now.getDate()}日 ${WD[now.getDay()]} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
   const isToday = iso === todayIso();
   const greeting = isToday
-    ? `现在是「${tg.greet}」的时段。${tg.vibe}。开头用贴合当前时段的问候打招呼（说「${tg.greet}」就好，不要总是说早安），并自然地带上贴合时段的人性化小提醒。`
+    ? `主人这边现在的真实时间是 ${nowLabel}。请先根据这个时间判断属于一天里的哪个时段（凌晨/清晨/上午/中午/下午/傍晚/深夜），再用贴合该时段的自然问候开场，并顺势给一点人性化的小关心（该吃饭了、记得喝水、别久坐、早点休息等）。开场问候和措辞尽量每次有些变化，不要机械地用同一个词。`
     : `这是一份「这一天的预告」，不要用「早安/晚安」这类时间问候（会显得奇怪），开头改用俏皮可爱的招呼（比如「喵～主人」），轻松活泼地带主人看看这一天的安排。`;
   try {
     const parts = [];
@@ -335,7 +327,7 @@ async function renderPreview(iso){
     const j = await ai({messages:[
       {role:'system',content:`你是主人的猫娘日程助手「小喵」。${greeting} 请用可爱的猫娘语气（适当用「喵」「主人」等口癖，但不要过度堆砌）为主人写一段当日纪要，语气温暖、给足情绪价值（关心、鼓励、卖萌）。把重要内容（具体时间、事件名称、截止日期、紧急事项、目标进度）用 **双星号** 包起来加粗。用中文，160字以内，可以分1-2小段，只输出纪要正文，不要标题或序号。`},
       {role:'user',content:`日期是 ${iso}（${WD[parse(iso).getDay()]}）。我这一天的信息：\n${parts.join('\n\n')}`}
-    ],temperature:0.8});
+    ],temperature:0.9});
     const text = (j.choices[0].message.content||'').trim();
     previewCache[key] = text;
     if (document.getElementById('aiPreviewBody')===el){ el.className='ai-body'; el.innerHTML = mdBold(text); }
