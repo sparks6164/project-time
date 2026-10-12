@@ -61,18 +61,26 @@ main { flex: 1; overflow-y: auto; overflow-x: hidden; position: relative; }
 .home-main { min-width: 0; }
 .home-side { position: sticky; top: 16px; display: flex; flex-direction: column; }
 .home-side .ai-card { margin-bottom: 16px; }
-.next-card { display: flex; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 16px 18px; margin-bottom: 22px; }
-.next-card .icon { font-size: 26px; line-height: 1; }
+.next-card { display: flex; align-items: center; gap: 26px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 29px 33px; margin-bottom: 22px; }
+.next-card .icon { font-size: 47px; line-height: 1; }
 .next-card .txt { flex: 1; min-width: 0; }
-.next-card .lbl { font-size: 12px; color: var(--text-3); letter-spacing: .04em; margin-bottom: 4px; }
-.next-card .val { font-size: 15px; color: var(--text-2); line-height: 1.5; }
+.next-card .lbl { font-size: 22px; color: var(--text-3); letter-spacing: .04em; margin-bottom: 6px; }
+.next-card .val { font-size: 27px; color: var(--text-2); line-height: 1.4; }
 .next-card .val b { color: var(--brand); font-weight: 700; }
 .past-divider { display: flex; align-items: center; gap: 10px; margin: 14px 0 8px; color: var(--text-3); font-size: 11px; font-weight: 600; letter-spacing: .05em; }
 .past-divider::before, .past-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 .past-divider span { padding: 2px 10px; border-radius: var(--radius-full); background: var(--surface-2); color: var(--text-3); }
-.home-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
+.home-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.home-head .head-left { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
+.home-head .head-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .home-head .date { font-family: var(--font-display); font-weight: 600; font-size: 28px; line-height: 1.2; }
 .home-head .sub { color: var(--text-2); font-size: 14px; margin-top: 4px; }
+.journal-btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); font-size: 13px; font-weight: 500; color: var(--text-2); white-space: nowrap; flex-shrink: 0; transition: border-color var(--ease-out) 120ms, color var(--ease-out) 120ms; }
+.journal-btn:hover { border-color: var(--brand); color: var(--brand); }
+.journal-btn .jdot { width: 7px; height: 7px; border-radius: 50%; background: var(--brand); display: none; }
+.journal-btn.has .jdot { display: inline-block; }
+.tomorrow-btn { padding: 9px 16px; border-radius: var(--radius-md); border: 1px solid var(--line-strong); background: var(--surface); font-size: 13px; font-weight: 500; color: var(--text-2); white-space: nowrap; transition: border-color var(--ease-out) 120ms, color var(--ease-out) 120ms; }
+.tomorrow-btn:hover { border-color: var(--brand); color: var(--brand); background: var(--surface-2); }
 .add-btn { width: 44px; height: 44px; border-radius: var(--radius-full); background: var(--brand); color: #fff; font-size: 24px; display: grid; place-items: center; box-shadow: var(--shadow-md); transition: background var(--ease-out) 120ms, transform var(--ease-out) 120ms; }
 .add-btn:hover { background: var(--brand-hover); transform: translateY(-1px); }
 .back-row { margin-bottom: 14px; }
@@ -169,6 +177,8 @@ main { flex: 1; overflow-y: auto; overflow-x: hidden; position: relative; }
 .ghost-btn { padding: 9px 16px; border-radius: var(--radius-md); font-weight: 500; border: 1px solid var(--line-strong); }
 .ghost-btn:hover { background: var(--surface-2); }
 .ghost-btn.danger { color: var(--danger); border-color: var(--danger); }
+.journal-modal { width: 560px; }
+.modal textarea[readonly] { background: var(--surface-2); color: var(--text-2); cursor: default; }
 
 /* ============ AI 对话面板 ============ */
 .chat-panel { position: fixed; top: 0; right: 0; bottom: 0; width: 380px; max-width: 92vw; background: var(--surface); border-left: 1px solid var(--line); box-shadow: var(--shadow-lg); z-index: 40; display: flex; flex-direction: column; transform: translateX(100%); transition: transform var(--ease-out) 240ms; }
