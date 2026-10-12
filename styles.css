@@ -181,3 +181,76 @@ main { flex: 1; overflow: hidden; position: relative; }
   .tabs button { padding: 6px 10px; }
   .chat-panel { width: 100vw; max-width: 100vw; }
 }
+
+/* ============ 分段选择器（类型 / 周月切换） ============ */
+.seg { display: inline-flex; gap: 4px; background: var(--surface-2); border-radius: var(--radius-md); padding: 3px; }
+.seg button { padding: 6px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; color: var(--text-2); white-space: nowrap; }
+.seg button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+
+/* ============ 目标 / 待办 界面 ============ */
+.tasks { max-width: 720px; margin: 0 auto; padding: 24px 22px 60px; }
+.tasks-head { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.tasks-head .ttl { font-family: var(--font-display); font-weight: 600; font-size: 22px; }
+.tasks-head .seg { margin-left: auto; }
+.task-section { margin-bottom: 28px; }
+.section-title { font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.section-title .cnt { background: var(--surface-2); border-radius: var(--radius-full); padding: 1px 8px; font-size: 11px; color: var(--text-2); }
+.empty.small { padding: 28px 0; }
+.empty.small .big { font-size: 22px; margin-bottom: 4px; }
+
+/* ============ 待办行 ============ */
+.todo-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); cursor: pointer; transition: border-color var(--ease-out) 120ms; }
+.todo-row:hover { border-color: var(--line-strong); }
+.todo-row .bar { width: 4px; align-self: stretch; border-radius: 2px; flex-shrink: 0; }
+.todo-row .body { flex: 1; min-width: 0; }
+.todo-row .name { font-weight: 500; }
+.todo-row .meta { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.todo-row .chev { color: var(--text-3); font-size: 18px; flex-shrink: 0; }
+.todo-row.done { opacity: .62; }
+.todo-row .done-name { text-decoration: line-through; }
+
+/* 完成状态三态按钮 */
+.status-seg { display: inline-flex; gap: 2px; background: var(--surface-2); border-radius: var(--radius-full); padding: 2px; flex-shrink: 0; }
+.status-btn { padding: 4px 10px; border-radius: var(--radius-full); font-size: 11px; font-weight: 500; color: var(--text-3); }
+.status-btn.on { color: #fff; }
+.status-btn.on[data-status="todo"] { background: var(--text-3); }
+.status-btn.on[data-status="doing"] { background: var(--info); }
+.status-btn.on[data-status="done"] { background: var(--success); }
+
+/* ============ 目标行 ============ */
+.goal-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); cursor: pointer; }
+.goal-row:hover { border-color: var(--line-strong); }
+.goal-row .body { flex: 1; min-width: 0; }
+.goal-row .name { font-weight: 500; }
+.goal-row .meta { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.goal-row .done-check { color: var(--success); font-weight: 700; }
+.goal-status { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: var(--radius-full); background: var(--surface-2); color: var(--text-2); flex-shrink: 0; white-space: nowrap; }
+.goal-status.done { background: var(--success); color: #fff; }
+.goal-slots { display: flex; gap: 6px; }
+.goal-slot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--surface); transition: all var(--ease-out) 120ms; }
+.goal-slot.on { background: var(--brand); border-color: var(--brand); }
+.goal-row .del { opacity: 0; font-size: 14px; color: var(--text-3); padding: 4px; border-radius: var(--radius-sm); flex-shrink: 0; }
+.goal-row:hover .del { opacity: 1; }
+.goal-row .del:hover { color: var(--danger); background: var(--surface-2); }
+
+/* 首页下方：待办提醒 / 目标 列表 */
+.reminder-list, .goal-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+
+/* ============ 时间轴：待办 DDL ============ */
+.tl-todos { padding: 0 18px 10px; display: flex; flex-direction: column; gap: 8px; }
+.tl-todos-title { font-size: 11px; color: var(--text-3); letter-spacing: .04em; text-transform: uppercase; font-weight: 600; }
+.tl-todo-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.todo-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: var(--radius-full); border: 1.5px solid var(--c); color: var(--c); font-size: 13px; font-weight: 500; background: var(--surface); }
+.todo-chip:hover { background: var(--surface-2); }
+.todo-chip .c-ddl { font-size: 11px; opacity: .72; }
+.tl-todo-line { position: absolute; top: 0; bottom: 0; left: 3px; width: 3px; border-radius: 2px; cursor: pointer; z-index: 2; }
+
+/* 日历里的待办小标记（方形区分日程圆点） */
+.cal-cell .dot.tdot { border-radius: 2px; }
+
+/* ============ 待办详情弹窗 ============ */
+.detail-list { display: flex; flex-direction: column; gap: 12px; }
+.detail-item { display: flex; align-items: flex-start; gap: 12px; }
+.detail-item .k { width: 62px; flex-shrink: 0; font-size: 12px; color: var(--text-3); font-weight: 500; padding-top: 2px; }
+.detail-item .v { flex: 1; font-size: 14px; word-break: break-word; }
+.imp-tag { display: inline-block; padding: 2px 10px; border-radius: var(--radius-full); color: #fff; font-size: 12px; font-weight: 600; }
