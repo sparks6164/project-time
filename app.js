@@ -33,6 +33,9 @@ let chatHistory = [];
 let previewCache = {};              // date -> text
 let backendOk = false;              // 本地服务器（AI）是否可用
 let tokenUsage = { prompt: 0, completion: 0, total: 0 };  // AI token 消耗累计
+let homeDate = null;                // 主页显示的日期（null=今天），「明天」按钮切换
+let currentDayIso = null;           // 当前渲染的日期（用于重新生成纪要）
+let journalDate = null;             // 日志弹窗当前编辑的日期
 
 /* ---------- 日期工具 ---------- */
 function pad(n){ return String(n).padStart(2,'0'); }
@@ -116,6 +119,7 @@ async function loadData(){
   if (!db.events) db.events = [];
   if (!db.todos) db.todos = [];
   if (!db.goals) db.goals = [];
+  if (!db.journals) db.journals = {};
   purgeDone();
   if (!db.seeded && db.events.length===0){ seed(); db.seeded=true; await saveData(); }
 }
@@ -177,7 +181,7 @@ function render(){
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.view===view));
   const v = document.getElementById('view');
   if (dayDate){ renderDay(v, parse(dayDate), true); return; }
-  if (view==='home') renderDay(v, new Date(), false);
+  if (view==='home') renderDay(v, homeDate ? parse(homeDate) : new Date(), false);
   else if (view==='calendar') renderCalendar(v);
   else if (view==='timeline') renderTimeline(v);
   else if (view==='goals') renderGoals(v);
@@ -209,22 +213,31 @@ function nextEventCard(list){
 function renderDay(v, date, showBack){
   const iso = fmt(date);
   const isToday = iso === todayIso();
+  const showSide = !showBack;                     // 主页（今天/明天）才显示右侧栏
+  currentDayIso = iso;
   const list = eventsOn(iso);
   const nm = nowMin();
   const past = isToday ? list.filter(e=>eventEndMin(e)<nm) : [];
   const upcoming = isToday ? list.filter(e=>eventEndMin(e)>=nm) : list;
 
+  const dayLabel = isToday ? '今天' : (iso===fmt(addDays(new Date(),1)) ? '明天' : date.getFullYear()+'年');
+  const hasJournal = db.journals && db.journals[iso];
+
   let html = '<div class="home">';
   if (showBack) html += `<div class="back-row"><button class="back-btn" id="backBtn">← 返回</button></div>`;
-  html += `<div class="home-head"><div>`;
-  html += `<div class="date">${date.getMonth()+1}月${date.getDate()}日 ${WD[date.getDay()]}</div>`;
-  html += `<div class="sub">${isToday?'今天':date.getFullYear()+'年'} · ${list.length} 项安排</div>`;
-  html += `</div><button class="add-btn" id="addBtn" title="添加日程">＋</button></div>`;
+  html += `<div class="home-head"><div class="head-left">`;
+  html += `<button class="journal-btn${hasJournal?' has':''}" id="journalBtn" data-date="${iso}">📓 随心日志<span class="jdot"></span></button>`;
+  html += `<div class="head-date"><div class="date">${date.getMonth()+1}月${date.getDate()}日 ${WD[date.getDay()]}</div>`;
+  html += `<div class="sub">${dayLabel} · ${list.length} 项安排</div></div>`;
+  html += `</div><div class="head-right">`;
+  if (showSide) html += (isToday ? `<button class="tomorrow-btn" id="tomorrowBtn">明天 →</button>` : `<button class="tomorrow-btn" id="tomorrowBtn">← 今天</button>`);
+  html += `<button class="add-btn" id="addBtn" title="添加日程">＋</button>`;
+  html += `</div></div>`;
 
-  if (isToday) html += `<div class="home-columns">`;
+  if (showSide) html += `<div class="home-columns">`;
   html += `<div class="home-main">`;
 
-  // 下一项日程倒计时（原纪要位置）
+  // 下一项日程倒计时（原纪要位置，仅今天）
   if (isToday) html += nextEventCard(list);
 
   html += `<div class="schedule-title">日程安排</div><div class="schedule-list">`;
@@ -237,10 +250,11 @@ function renderDay(v, date, showBack){
   }
   html += `</div></div>`; // schedule-list + home-main
 
-  if (isToday){
+  if (showSide){
     html += `<aside class="home-side">`;
-    // 🐱 今日纪要（移到右上）
-    html += `<div class="ai-card"><div class="ai-head"><span class="t">🐱 今日纪要</span><button class="regen" id="regenBtn">重新生成</button></div>`;
+    // 🐱 当日纪要（今天=今日纪要，明天=明日纪要）
+    const summaryLabel = isToday ? '今日纪要' : '明日纪要';
+    html += `<div class="ai-card"><div class="ai-head"><span class="t">🐱 ${summaryLabel}</span><button class="regen" id="regenBtn">重新生成</button></div>`;
     html += `<div class="ai-body" id="aiPreviewBody"></div></div>`;
     // 待办提醒（ddl 临近 / 非常紧急）
     const rem = homeReminders();
@@ -281,7 +295,7 @@ function renderDay(v, date, showBack){
   html += `</div>`; // home
   v.innerHTML = html;
 
-  if (isToday) renderPreview(iso);
+  if (showSide) renderPreview(iso);
 }
 
 /* ---------- AI 今日纪要（猫娘） ---------- */
@@ -302,8 +316,8 @@ async function renderPreview(iso){
     if (rem.length) parts.push('【待办提醒】\n'+rem.map(t=>`${t.name}（ddl ${t.ddl}，${IMPORTANCE[effectiveImportance(t)].label}）`).join('\n'));
     if (goals.length) parts.push('【目标】\n'+goals.map(g=>`${g.name}（${g.period==='week'?'每周':'每月'} ${g.freq} 次，已完成 ${Math.min(goalCount(g),g.freq)}/${g.freq}）`).join('\n'));
     const j = await ai({messages:[
-      {role:'system',content:'你是主人的猫娘日程助手「小喵」。请用可爱的猫娘语气（适当用「喵」「主人」等口癖，但不要过度堆砌）为主人写一段今日纪要，语气温暖、给足情绪价值（关心、鼓励、卖萌）。把重要内容（具体时间、事件名称、截止日期、紧急事项、目标进度）用 **双星号** 包起来加粗。用中文，160字以内，可以分1-2小段，只输出纪要正文，不要标题或序号。'},
-      {role:'user',content:`今天是 ${iso}（${WD[parse(iso).getDay()]}）。我的今日信息：\n${parts.join('\n\n')}`}
+      {role:'system',content:'你是主人的猫娘日程助手「小喵」。请用可爱的猫娘语气（适当用「喵」「主人」等口癖，但不要过度堆砌）为主人写一段当日纪要，语气温暖、给足情绪价值（关心、鼓励、卖萌）。把重要内容（具体时间、事件名称、截止日期、紧急事项、目标进度）用 **双星号** 包起来加粗。用中文，160字以内，可以分1-2小段，只输出纪要正文，不要标题或序号。'},
+      {role:'user',content:`日期是 ${iso}（${WD[parse(iso).getDay()]}）。我这一天的信息：\n${parts.join('\n\n')}`}
     ],temperature:0.8});
     const text = (j.choices[0].message.content||'').trim();
     previewCache[iso] = text;
@@ -689,6 +703,58 @@ function appendMsg(role, text){
 }
 
 /* ============================================================
+   随心日志
+   ============================================================ */
+function openJournal(iso){
+  journalDate = iso;
+  const d = parse(iso);
+  const isToday = iso === todayIso();
+  const journal = db.journals[iso];
+  document.getElementById('journalTitle').textContent = `随心日志 · ${d.getMonth()+1}月${d.getDate()}日 ${WD[d.getDay()]}`;
+  const ta = document.getElementById('journalText');
+  ta.value = journal || '';
+  ta.readOnly = !isToday;
+  ta.placeholder = isToday ? '写下今天的心情、随想…' : '这一天还没有日志';
+  document.getElementById('journalPolish').style.display = isToday ? '' : 'none';
+  document.getElementById('journalSave').style.display = isToday ? '' : 'none';
+  const hint = document.getElementById('journalHint');
+  hint.textContent = isToday ? '记录今天（仅当天可编写）' : `仅当天可编写日志（今天是 ${new Date().getMonth()+1}月${new Date().getDate()}日）`;
+  document.getElementById('journalOverlay').classList.add('show');
+  if (isToday) setTimeout(()=>ta.focus(),0);
+}
+async function polishJournal(){
+  const ta = document.getElementById('journalText');
+  const text = ta.value.trim();
+  if (!text){ toast('请先写点内容再润色'); return; }
+  if (!backendOk){ toast('AI 润色需本地运行 node server.js'); return; }
+  const btn = document.getElementById('journalPolish');
+  btn.disabled = true; const old = btn.textContent; btn.textContent = '润色中…';
+  try {
+    const j = await ai({messages:[
+      {role:'system',content:'你是写作助手。请润色用户的日记：让它更流畅、更有文采，保留原意、第一人称语气和大致结构，不要添加虚构事实。直接输出润色后的正文，不要解释、不要标题。'},
+      {role:'user',content:text}
+    ], temperature:0.7});
+    ta.value = (j.choices[0].message.content||'').trim();
+    toast('已润色，可继续修改或保存');
+  } catch(e){
+    toast('润色失败：'+e.message);
+  } finally { btn.disabled=false; btn.textContent=old; }
+}
+document.getElementById('journalClose').onclick=()=>document.getElementById('journalOverlay').classList.remove('show');
+document.getElementById('journalPolish').onclick=polishJournal;
+document.getElementById('journalSave').onclick=async ()=>{
+  const text = document.getElementById('journalText').value.trim();
+  if (journalDate){
+    if (text) db.journals[journalDate] = text;
+    else delete db.journals[journalDate];
+    await saveData();
+  }
+  document.getElementById('journalOverlay').classList.remove('show');
+  render();
+  toast('日志已保存');
+};
+
+/* ============================================================
    事件绑定
    ============================================================ */
 function toast(msg){
@@ -699,17 +765,21 @@ function toast(msg){
 // 顶部标签
 document.getElementById('tabs').addEventListener('click', e=>{
   const b=e.target.closest('button'); if(!b) return;
-  view=b.dataset.view; dayDate=null; render();
+  view=b.dataset.view; dayDate=null; homeDate=null; render();
 });
 
 // 视图内事件委托
 document.getElementById('view').addEventListener('click', async e=>{
   // 返回
   if (e.target.closest('#backBtn')){ dayDate=null; render(); return; }
+  // 明天 / 今天切换
+  if (e.target.closest('#tomorrowBtn')){ homeDate = homeDate ? null : fmt(addDays(new Date(),1)); render(); return; }
+  // 随心日志
+  if (e.target.closest('#journalBtn')){ openJournal(e.target.closest('#journalBtn').dataset.date); return; }
   // 添加日程
-  if (e.target.closest('#addBtn')){ openAdd(null, dayDate || undefined, undefined); return; }
+  if (e.target.closest('#addBtn')){ openAdd(null, dayDate || homeDate || undefined, undefined); return; }
   // 重新生成纪要
-  if (e.target.closest('#regenBtn')){ delete previewCache[todayIso()]; render(); return; }
+  if (e.target.closest('#regenBtn')){ delete previewCache[currentDayIso || todayIso()]; render(); return; }
   // 目标/待办：添加按钮
   if (e.target.closest('#taskAddBtn')){ openTaskAdd(null, 'todo'); return; }
   // 目标/待办：周/月切换
@@ -930,6 +1000,7 @@ document.addEventListener('keydown',e=>{
     document.getElementById('importOverlay').classList.remove('show');
     document.getElementById('taskOverlay').classList.remove('show');
     document.getElementById('todoDetailOverlay').classList.remove('show');
+    document.getElementById('journalOverlay').classList.remove('show');
   }
 });
 
